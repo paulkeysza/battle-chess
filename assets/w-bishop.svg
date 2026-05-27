@@ -1,0 +1,9 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" rx="28" fill="#10112d" />
+  <circle cx="100" cy="100" r="75" fill="#f8f0d8" />
+  <path d="M78,72 C90,40 110,40 122,72 L122,130 C122,150 78,150 78,130 Z" fill="#8c6f1c" />
+  <path d="M100,50 L100,80" stroke="#f8f0d8" stroke-width="12" stroke-linecap="round" />
+  <path d="M88,90 C98,120 102,120 112,90" fill="none" stroke="#1a1a2d" stroke-width="10" />
+  <path d="M68,100 L132,100" stroke="#1a1a2d" stroke-width="12" stroke-linecap="round" />
+  <text x="100" y="185" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="700">Blade Mystic</text>
+</svg>

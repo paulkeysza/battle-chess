@@ -1,0 +1,11 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" rx="28" fill="#121328" />
+  <circle cx="100" cy="105" r="70" fill="#231f3f" />
+  <path d="M60,95 C72,80 118,80 140,95 C134,110 134,128 130,140 C100,150 90,150 70,140 C66,128 66,110 60,95 Z" fill="#ded7a8" />
+  <circle cx="80" cy="95" r="12" fill="#121328" />
+  <circle cx="120" cy="95" r="12" fill="#121328" />
+  <path d="M82,115 Q100,130 118,115" fill="none" stroke="#121328" stroke-width="10" stroke-linecap="round" />
+  <path d="M88,50 L112,78" stroke="#ded7a8" stroke-width="14" stroke-linecap="round" />
+  <path d="M112,50 L88,78" stroke="#ded7a8" stroke-width="14" stroke-linecap="round" />
+  <text x="100" y="185" text-anchor="middle" fill="#ded7a8" font-family="Arial, sans-serif" font-size="20" font-weight="700">Storm Scout</text>
+</svg>

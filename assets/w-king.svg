@@ -1,0 +1,18 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd966" />
+      <stop offset="100%" stop-color="#f2a500" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="28" fill="#0f1023" />
+  <circle cx="100" cy="100" r="70" fill="#fff2d7" />
+  <polygon points="50,70 70,45 90,70 110,45 130,70 150,45 170,70 170,90 30,90" fill="url(#gold)" />
+  <path d="M60,120 C70,145 130,145 140,120" fill="none" stroke="#5f3900" stroke-width="12" stroke-linecap="round" />
+  <circle cx="75" cy="90" r="12" fill="#17172f" />
+  <circle cx="125" cy="90" r="12" fill="#17172f" />
+  <path d="M80,75 Q100,55 120,75" fill="none" stroke="#17172f" stroke-width="10" stroke-linecap="round" />
+  <path d="M90,135 L110,115" stroke="#17172f" stroke-width="12" stroke-linecap="round" />
+  <path d="M110,135 L90,115" stroke="#17172f" stroke-width="12" stroke-linecap="round" />
+  <text x="100" y="185" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="22" font-weight="700">Thunder King</text>
+</svg>

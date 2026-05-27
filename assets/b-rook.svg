@@ -1,0 +1,11 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" rx="28" fill="#11132c" />
+  <rect x="42" y="45" width="116" height="110" rx="18" fill="#2a244c" />
+  <rect x="54" y="25" width="92" height="30" rx="10" fill="#50406f" />
+  <rect x="68" y="20" width="16" height="20" rx="8" fill="#ffffff" />
+  <rect x="116" y="20" width="16" height="20" rx="8" fill="#ffffff" />
+  <rect x="92" y="20" width="16" height="20" rx="8" fill="#ffffff" />
+  <path d="M70,80 L130,80 L130,130 L70,130 Z" fill="#0f1124" />
+  <path d="M90,80 L110,80 C115,80 115,95 110,95 L90,95 C85,95 85,80 90,80 Z" fill="#9c8da1" />
+  <text x="100" y="185" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="700">Battle Tower</text>
+</svg>

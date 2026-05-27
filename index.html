@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thunder Pride Battle Chess</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="game-shell">
+    <section class="arena-panel" aria-label="3D battle chess arena">
+      <canvas id="arena"></canvas>
+      <div class="hud top-hud">
+        <div>
+          <p class="eyebrow">Thunder Pride Battle Chess</p>
+          <h1>Animated 3D Chess Arena</h1>
+        </div>
+        <div class="turn-pill" id="turn-pill">White Pride</div>
+      </div>
+      <div class="hud bottom-hud">
+        <p id="status">White Pride starts. Select a piece.</p>
+        <div class="actions">
+          <button id="reset-button" type="button">Reset</button>
+          <button id="camera-button" type="button">Camera</button>
+          <button id="sound-button" type="button" aria-pressed="true">Sound On</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side-panel" aria-label="Game information">
+      <section class="panel-block">
+        <h2>Cast</h2>
+        <div id="cast-list" class="cast-list"></div>
+      </section>
+      <section class="panel-block">
+        <h2>Captured</h2>
+        <div class="captured-grid">
+          <div>
+            <h3>White</h3>
+            <p id="white-captured">None</p>
+          </div>
+          <div>
+            <h3>Black</h3>
+            <p id="black-captured">None</p>
+          </div>
+        </div>
+      </section>
+      <section class="panel-block compact">
+        <h2>Originality Note</h2>
+        <p>This is an original thunder-feline fantasy homage with chess rules and theatrical capture animations, not a copy of Battle Chess or ThunderCats art.</p>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" rx="28" fill="#10122b" />
+  <circle cx="100" cy="100" r="72" fill="#1f1e35" />
+  <path d="M55,88 C60,40 140,40 145,88 L145,118 C145,147 55,147 55,118 Z" fill="#d3a168" />
+  <circle cx="70" cy="95" r="12" fill="#ffffff" />
+  <circle cx="130" cy="95" r="12" fill="#ffffff" />
+  <path d="M78,109 Q100,125 122,109" fill="none" stroke="#ffffff" stroke-width="10" />
+  <line x1="100" y1="55" x2="100" y2="30" stroke="#ffffff" stroke-width="12" stroke-linecap="round" />
+  <circle cx="100" cy="30" r="10" fill="#ffffff" />
+  <text x="100" y="185" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="700">Thunder Queen</text>
+</svg>
