@@ -6,6 +6,9 @@ const turnPill = document.getElementById('turn-pill');
 const resetButton = document.getElementById('reset-button');
 const cameraButton = document.getElementById('camera-button');
 const soundButton = document.getElementById('sound-button');
+let modeOverlay = document.getElementById('mode-overlay');
+let modeButtons = document.querySelectorAll('.pvp-button, .cpu-button');
+let inlineModeActions = document.getElementById('inline-mode-actions');
 const castList = document.getElementById('cast-list');
 const whiteCapturedElement = document.getElementById('white-captured');
 const blackCapturedElement = document.getElementById('black-captured');
@@ -20,7 +23,35 @@ const pieceData = {
   rook: { name: 'Claw Bastion', code: 'CB', move: 'Armored straight-line guardian' },
   bishop: { name: 'Sky Oracle', code: 'SO', move: 'Diagonal storm caster' },
   knight: { name: 'Sabre Leaper', code: 'SL', move: 'Vaulting L-shaped hunter' },
-  pawn: { name: 'Pride Scout', code: 'PS', move: 'Frontline cub warrior' }
+  pawn: { name: 'Cub Scout', code: 'CS', move: 'Frontline cub warrior' }
+};
+
+const pieceAssetPaths = {
+  white: {
+    king: { idle: 'assets/piece-blue-king-clean.png', walk: 'assets/piece-blue-king-clean.png' },
+    queen: { idle: 'assets/piece-blue-queen-clean.png', walk: 'assets/piece-blue-queen-clean.png' },
+    rook: { idle: 'assets/piece-blue-rook-clean.png', walk: 'assets/piece-blue-rook-clean.png' },
+    bishop: { idle: 'assets/piece-blue-bishop-clean.png', walk: 'assets/piece-blue-bishop-clean.png' },
+    knight: { idle: 'assets/piece-blue-knight-clean.png', walk: 'assets/piece-blue-knight-clean.png' },
+    pawn: { idle: 'assets/piece-blue-pawn-clean.png', walk: 'assets/piece-blue-pawn-clean.png' }
+  },
+  black: {
+    king: { idle: 'assets/piece-red-king-clean.png', walk: 'assets/piece-red-king-clean.png' },
+    queen: { idle: 'assets/piece-red-queen-clean.png', walk: 'assets/piece-red-queen-clean.png' },
+    rook: { idle: 'assets/piece-red-rook-clean.png', walk: 'assets/piece-red-rook-clean.png' },
+    bishop: { idle: 'assets/piece-red-bishop-clean.png', walk: 'assets/piece-red-bishop-clean.png' },
+    knight: { idle: 'assets/piece-red-knight-clean.png', walk: 'assets/piece-red-knight-clean.png' },
+    pawn: { idle: 'assets/piece-red-pawn-clean.png', walk: 'assets/piece-red-pawn-clean.png' }
+  }
+};
+
+const pieceDisplaySizes = {
+  king: { size: 2.24, y: 1.08 },
+  queen: { size: 2.24, y: 1.08 },
+  rook: { size: 2.12, y: 1.02 },
+  bishop: { size: 2.18, y: 1.05 },
+  knight: { size: 2.02, y: 0.98 },
+  pawn: { size: 1.72, y: 0.82 }
 };
 
 const initialBoard = {
@@ -39,6 +70,8 @@ const animations = [];
 const pointer = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
 const clock = new THREE.Clock();
+const textureLoader = new THREE.TextureLoader();
+const pieceSpriteMaterials = {};
 
 let selectedSquare = null;
 let currentPlayer = 'white';
@@ -49,6 +82,10 @@ let dragStart = null;
 let orbitAngle = 0;
 let audioContext = null;
 let soundEnabled = true;
+let gameMode = null;
+let cpuMoveTimer = null;
+
+const cpuColor = 'black';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x080a10);
@@ -75,6 +112,7 @@ setupMaterials();
 setupLights();
 buildArena();
 renderCast();
+ensureModeControls();
 resetGame();
 resizeRenderer();
 animate();
@@ -89,6 +127,49 @@ resetButton.addEventListener('click', () => {
 });
 cameraButton.addEventListener('click', cycleCamera);
 soundButton.addEventListener('click', toggleSound);
+
+function ensureModeControls() {
+  if (!modeButtons.length) {
+    const fallback = document.createElement('div');
+    fallback.id = 'inline-mode-actions';
+    fallback.className = 'mode-actions inline-mode-actions generated-mode-actions';
+    fallback.style.display = 'grid';
+    fallback.style.gridTemplateColumns = '1fr 1fr';
+    fallback.style.gap = '10px';
+    fallback.style.width = 'min(360px, calc(100vw - 44px))';
+    fallback.innerHTML = `
+      <button class="pvp-button" type="button">Player vs Player</button>
+      <button class="cpu-button" type="button">Player vs CPU</button>
+    `;
+    fallback.querySelectorAll('button').forEach((button) => {
+      button.style.minHeight = '42px';
+      button.style.border = '1px solid rgba(255, 255, 255, 0.22)';
+      button.style.borderRadius = '8px';
+      button.style.background = 'rgba(9, 12, 18, 0.9)';
+      button.style.color = '#f6f2e8';
+      button.style.cursor = 'pointer';
+      button.style.fontWeight = '800';
+    });
+
+    const statusGroup = statusElement.parentElement;
+    statusGroup.appendChild(fallback);
+    inlineModeActions = fallback;
+    modeButtons = document.querySelectorAll('.pvp-button, .cpu-button');
+  }
+
+  modeButtons.forEach((button) => {
+    button.addEventListener('click', () => startMode(button.classList.contains('cpu-button') ? 'cpu' : 'pvp'));
+  });
+}
+
+function startMode(mode) {
+  gameMode = mode;
+  if (modeOverlay) modeOverlay.hidden = true;
+  if (inlineModeActions) inlineModeActions.hidden = true;
+  ensureAudio();
+  playSound('reset');
+  resetGame();
+}
 
 function setupMaterials() {
   materials.lightTile = new THREE.MeshStandardMaterial({ color: 0xd8c48a, roughness: 0.56, metalness: 0.12 });
@@ -176,6 +257,11 @@ function buildArena() {
 }
 
 function resetGame() {
+  if (cpuMoveTimer) {
+    window.clearTimeout(cpuMoveTimer);
+    cpuMoveTimer = null;
+  }
+
   for (const piece of pieces.values()) {
     boardGroup.remove(piece.group);
   }
@@ -191,7 +277,7 @@ function resetGame() {
   animations.length = 0;
   clearHighlights();
   Object.entries(boardState).forEach(([square, tag]) => createPiece(square, tag));
-  updateHud('White Pride starts. Select a piece.');
+  updateHud(gameMode ? 'Blue starts. Select a piece.' : 'Choose a mode to begin.');
   updateCaptured();
 }
 
@@ -213,12 +299,12 @@ function createPiece(square, tag) {
   const group = new THREE.Group();
   group.position.copy(squareToPosition(square));
   group.position.y = 0.18;
-  group.rotation.y = color === 'white' ? 0 : Math.PI;
   group.userData.square = square;
   group.userData.tag = tag;
   group.userData.color = color;
   group.userData.type = type;
   group.userData.baseY = 0.18;
+  group.userData.standParts = [];
 
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.44, 32), materials.shadow);
   shadow.rotation.x = -Math.PI / 2;
@@ -226,23 +312,128 @@ function createPiece(square, tag) {
   shadow.renderOrder = -1;
   group.add(shadow);
 
-  const bodyMaterial = color === 'white' ? materials.whiteBody : materials.blackBody;
-  const armorMaterial = color === 'white' ? materials.whiteArmor : materials.blackArmor;
-
-  addCoreBody(group, type, bodyMaterial, armorMaterial);
-  addFelineHead(group, type, bodyMaterial, armorMaterial);
-  addRoleDetails(group, type, armorMaterial);
+  addCaricatureSprite(group, type, color);
 
   group.traverse((child) => {
     if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
+      child.castShadow = !child.userData.hitbox;
+      child.receiveShadow = !child.userData.hitbox;
+      child.userData.pieceGroup = group;
+    }
+
+    if (child.isSprite) {
       child.userData.pieceGroup = group;
     }
   });
 
   pieces.set(square, { group, tag, type, color });
   boardGroup.add(group);
+}
+
+function addPieceBase(group, type, color) {
+  const radius = type === 'pawn' ? 0.42 : type === 'knight' ? 0.46 : 0.52;
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius * 1.12, 0.2, 48),
+    materials.gold
+  );
+  base.position.y = 0.1;
+  group.userData.standParts.push(base);
+  group.add(base);
+
+  const accent = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 1.02, 0.025, 8, 64),
+    color === 'white' ? materials.whiteArmor : materials.blackArmor
+  );
+  accent.position.y = 0.23;
+  accent.rotation.x = Math.PI / 2;
+  group.userData.standParts.push(accent);
+  group.add(accent);
+}
+
+function addCaricatureSprite(group, type, color) {
+  const display = pieceDisplaySizes[type];
+  const sprite = new THREE.Sprite(getPieceSpriteMaterial(type, color, 'idle'));
+  sprite.position.y = display.y;
+  sprite.scale.set(display.size, display.size, 1);
+  sprite.renderOrder = 2;
+  sprite.userData.homeY = display.y;
+  sprite.userData.homeScale = { x: display.size, y: display.size };
+  sprite.userData.type = type;
+  sprite.userData.color = color;
+  group.userData.sprite = sprite;
+  group.add(sprite);
+
+  const hitbox = new THREE.Mesh(
+    new THREE.BoxGeometry(display.size * 0.54, display.size * 0.74, 0.38),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+  );
+  hitbox.position.y = display.y;
+  hitbox.userData.hitbox = true;
+  hitbox.userData.pieceGroup = group;
+  group.add(hitbox);
+}
+
+function addWalkingLegs(group, type) {
+  const legGroup = new THREE.Group();
+  const furMaterial = new THREE.MeshStandardMaterial({
+    color: getFurColor(type),
+    roughness: 0.68,
+    metalness: 0.05
+  });
+  const pawMaterial = new THREE.MeshStandardMaterial({
+    color: type === 'rook' || type === 'knight' ? 0x1f2430 : 0xf2e3c6,
+    roughness: 0.72,
+    metalness: 0.02
+  });
+  const legHeight = type === 'pawn' ? 0.38 : 0.48;
+  const legRadius = type === 'pawn' ? 0.055 : 0.068;
+
+  [-1, 1].forEach((side) => {
+    const leg = new THREE.Group();
+    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(legRadius, legHeight, 5, 10), furMaterial);
+    upper.position.y = legHeight * 0.46;
+    leg.add(upper);
+
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(legRadius * 1.35, 12, 8), pawMaterial);
+    paw.position.y = 0.02;
+    paw.scale.set(1.45, 0.62, 1.1);
+    leg.add(paw);
+
+    leg.position.set(side * (type === 'pawn' ? 0.12 : 0.16), 0.12, 0.16);
+    leg.userData.homeX = leg.position.x;
+    leg.userData.side = side;
+    legGroup.add(leg);
+  });
+
+  legGroup.visible = true;
+  legGroup.userData.homeY = legGroup.position.y;
+  group.userData.legGroup = legGroup;
+  group.add(legGroup);
+}
+
+function getFurColor(type) {
+  if (type === 'rook') return 0x17191d;
+  if (type === 'knight') return 0x6e8191;
+  if (type === 'bishop') return 0xd38b38;
+  return 0xd48a35;
+}
+
+function getPieceSpriteMaterial(type, color, pose = 'idle') {
+  const key = `${color}-${type}-${pose}`;
+
+  if (!pieceSpriteMaterials[key]) {
+    const texture = textureLoader.load(pieceAssetPaths[color][type][pose]);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    pieceSpriteMaterials[key] = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: false,
+      alphaTest: 0.18,
+      depthWrite: true
+    });
+  }
+
+  return pieceSpriteMaterials[key];
 }
 
 function addCoreBody(group, type, bodyMaterial, armorMaterial) {
@@ -429,7 +620,7 @@ function handlePointerUp(event) {
 }
 
 function pickSquare(event) {
-  if (isAnimating || gameOver) return;
+  if (!gameMode || isAnimating || gameOver || isCpuTurn()) return;
   ensureAudio();
   const rect = canvas.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -443,6 +634,8 @@ function pickSquare(event) {
 }
 
 function handleSquareSelection(square) {
+  if (isCpuTurn()) return;
+
   const piece = getPiece(square);
   const pieceColor = getPieceColor(piece);
 
@@ -467,7 +660,7 @@ function handleSquareSelection(square) {
     const typeName = pieceData[getPieceType(piece)].name;
     highlightMoves(square);
     updateHud(`${typeName} selected. Choose a highlighted square.`);
-    playSound('select');
+    playSelectionSound(getPieceType(piece));
   }
 }
 
@@ -499,7 +692,7 @@ function movePiece(source, target) {
 
   if (destinationTag && targetPiece) {
     updateHud(`${pieceData[getPieceType(movingTag)].name} challenges ${pieceData[getPieceType(destinationTag)].name}.`);
-    playFightSoundtrack();
+    playFightSoundtrack(getPieceType(movingTag), getPieceType(destinationTag));
     animateBattle(movingPiece.group, targetPiece.group, source, target, () => {
       captured[getPieceColor(destinationTag)].push(pieceData[getPieceType(destinationTag)].name);
       boardGroup.remove(targetPiece.group);
@@ -532,6 +725,47 @@ function finalizeMove(source, target, tag, movingPiece, capturedTag) {
   isAnimating = false;
   updateCaptured();
   updateHud(`${sideLabel(currentPlayer)} moves next.`);
+  scheduleCpuMove();
+}
+
+function isCpuTurn() {
+  return gameMode === 'cpu' && currentPlayer === cpuColor && !gameOver;
+}
+
+function scheduleCpuMove() {
+  if (!isCpuTurn()) return;
+  updateHud('Red is thinking...');
+  cpuMoveTimer = window.setTimeout(makeCpuMove, 650);
+}
+
+function makeCpuMove() {
+  cpuMoveTimer = null;
+  if (!isCpuTurn() || isAnimating) return;
+
+  const moves = getAllLegalMoves(cpuColor);
+  if (!moves.length) {
+    gameOver = true;
+    updateHud('Blue wins. Red has no legal moves.');
+    return;
+  }
+
+  const captures = moves.filter((move) => getPiece(move.target));
+  const pool = captures.length ? captures : moves;
+  const choice = pool[Math.floor(Math.random() * pool.length)];
+  movePiece(choice.source, choice.target);
+}
+
+function getAllLegalMoves(color) {
+  const moves = [];
+
+  Object.entries(boardState).forEach(([square, tag]) => {
+    if (getPieceColor(tag) !== color) return;
+    calculateLegalMoves(square).forEach((target) => {
+      moves.push({ source: square, target });
+    });
+  });
+
+  return moves;
 }
 
 function animateTravel(group, targetPosition, onDone) {
@@ -539,23 +773,110 @@ function animateTravel(group, targetPosition, onDone) {
   const to = targetPosition.clone();
   to.y = 0.18;
   const distance = from.distanceTo(to);
-  const duration = THREE.MathUtils.clamp(0.46 + distance * 0.09, 0.58, 1.18);
+  const duration = THREE.MathUtils.clamp(0.48 + distance * 0.16, 0.72, 1.55);
   const startRotation = group.rotation.clone();
   const moveType = group.userData.type;
+  const strideCount = Math.max(2, Math.round(distance * (moveType === 'pawn' ? 1.4 : 1.65)));
+  const facingAngle = Math.atan2(to.x - from.x, to.z - from.z);
+  setWalkingMode(group, true);
+
   addAnimation(duration, (t) => {
     const eased = easeInOut(t);
-    const stride = Math.sin(t * Math.PI * Math.max(2, Math.round(distance * 1.45)));
-    const hopHeight = moveType === 'knight' ? 1.35 : 0.46;
+    const landing = segment(t, 0.84, 1);
     group.position.lerpVectors(from, to, eased);
-    group.position.y = 0.18 + Math.sin(t * Math.PI) * hopHeight;
-    group.rotation.z = startRotation.z + stride * (moveType === 'rook' ? 0.045 : 0.12);
-    group.rotation.x = startRotation.x + Math.sin(t * Math.PI * 2) * (moveType === 'knight' ? 0.2 : 0.08);
-    group.scale.y = 1 + Math.abs(stride) * 0.035;
+    group.rotation.y = THREE.MathUtils.lerp(startRotation.y, facingAngle, Math.min(t * 4, 1));
+    applyWalkingPose(group, t, strideCount, moveType);
+
+    if (landing > 0) {
+      const settle = Math.sin(landing * Math.PI);
+      group.position.y -= settle * 0.035;
+      group.rotation.z *= 1 - landing;
+      group.rotation.x *= 1 - landing;
+    }
   }, () => {
-    group.rotation.copy(startRotation);
-    group.scale.set(1, 1, 1);
+    setWalkingMode(group, false);
+    resetPiecePose(group, startRotation);
     onDone();
   });
+}
+
+function setWalkingMode(group, isWalking) {
+  const sprite = group.userData.sprite;
+  const color = group.userData.color;
+  const type = group.userData.type;
+
+  group.userData.standParts.forEach((part) => {
+    part.visible = !isWalking;
+  });
+
+  if (sprite) {
+    sprite.material = getPieceSpriteMaterial(type, color, 'idle');
+  }
+
+  if (group.userData.legGroup) {
+    group.userData.legGroup.visible = isWalking;
+  }
+}
+
+function applyWalkingPose(group, t, strideCount, moveType) {
+  const sprite = group.userData.sprite;
+  const legGroup = group.userData.legGroup;
+  const phase = t * Math.PI * 2 * strideCount;
+  const stride = Math.sin(phase);
+  const footfall = Math.abs(stride);
+  const lift = Math.max(0, Math.sin(phase + Math.PI / 2));
+  const weight = moveType === 'rook' ? 0.55 : moveType === 'pawn' ? 0.82 : 1;
+  const knightLift = moveType === 'knight' ? 0.055 : 0;
+
+  group.position.y = group.userData.baseY + footfall * (0.055 * weight + knightLift);
+  group.rotation.z = stride * 0.09 * weight;
+  group.rotation.x = -lift * 0.045 * weight;
+  group.scale.set(1 + footfall * 0.018, 1 - footfall * 0.014, 1);
+
+  if (sprite) {
+    const homeY = sprite.userData.homeY;
+    const homeScale = sprite.userData.homeScale;
+    sprite.position.x = stride * 0.045 * weight;
+    sprite.position.y = homeY + footfall * 0.055 * weight;
+    sprite.scale.set(
+      homeScale.x * (1 - footfall * 0.018),
+      homeScale.y * (1 + footfall * 0.026),
+      1
+    );
+  }
+
+  if (legGroup) {
+    legGroup.children.forEach((leg) => {
+      const legPhase = phase + (leg.userData.side > 0 ? 0 : Math.PI);
+      const step = Math.sin(legPhase);
+      const liftStep = Math.max(0, Math.cos(legPhase));
+      leg.position.x = leg.userData.homeX + step * 0.065 * weight;
+      leg.position.y = liftStep * 0.08 * weight;
+      leg.rotation.z = -step * 0.42 * weight;
+      leg.rotation.x = liftStep * 0.18 * weight;
+    });
+  }
+}
+
+function resetPiecePose(group, rotation) {
+  const sprite = group.userData.sprite;
+  group.rotation.copy(rotation);
+  group.scale.set(1, 1, 1);
+  group.position.y = group.userData.baseY;
+
+  if (sprite) {
+    sprite.position.x = 0;
+    sprite.position.y = sprite.userData.homeY;
+    sprite.scale.set(sprite.userData.homeScale.x, sprite.userData.homeScale.y, 1);
+  }
+
+  if (group.userData.legGroup) {
+    group.userData.legGroup.children.forEach((leg) => {
+      leg.position.x = leg.userData.homeX;
+      leg.position.y = 0;
+      leg.rotation.set(0, 0, 0);
+    });
+  }
 }
 
 function animateBattle(attacker, defender, source, target, onDone) {
@@ -565,61 +886,99 @@ function animateBattle(attacker, defender, source, target, onDone) {
   const sourcePos = squareToPosition(source);
   const attackFacing = targetPos.clone().sub(sourcePos);
   const retreatFacing = sourcePos.clone().sub(targetPos);
-  const attackerStance = targetPos.clone().add(retreatFacing.normalize().multiplyScalar(0.5));
-  const defenderStance = targetPos.clone().add(attackFacing.normalize().multiplyScalar(0.25));
+  const attackerStance = targetPos.clone().add(retreatFacing.normalize().multiplyScalar(0.58));
+  const defenderStance = targetPos.clone().add(attackFacing.normalize().multiplyScalar(0.18));
+  const attackerWindup = attackerStance.clone().add(retreatFacing.clone().multiplyScalar(0.24));
+  const defenderWindup = defenderStance.clone().add(attackFacing.clone().multiplyScalar(0.18));
   attackerStance.y = 0.18;
   defenderStance.y = 0.18;
+  attackerWindup.y = 0.18;
+  defenderWindup.y = 0.18;
   const attackerStartRotation = attacker.rotation.clone();
   const defenderStartRotation = defender.rotation.clone();
+  setWalkingMode(attacker, true);
 
   const flash = createFlash(targetPos);
   boardGroup.add(flash);
   const shockwave = createShockwave(targetPos);
   boardGroup.add(shockwave);
+  const clashRing = createClashRing(targetPos);
+  boardGroup.add(clashRing);
 
-  addAnimation(2.35, (t) => {
-    const approach = segment(t, 0, 0.28);
-    const clashOne = segment(t, 0.26, 0.44);
-    const counter = segment(t, 0.43, 0.62);
-    const finalHit = segment(t, 0.62, 0.82);
-    const vanish = segment(t, 0.78, 1);
+  addAnimation(3.1, (t) => {
+    const approach = segment(t, 0, 0.22);
+    const squareOff = segment(t, 0.2, 0.34);
+    const firstStrike = segment(t, 0.34, 0.48);
+    const counterStrike = segment(t, 0.48, 0.63);
+    const finalStrike = segment(t, 0.64, 0.82);
+    const vanish = segment(t, 0.8, 1);
+    const clashPulse = Math.max(
+      Math.sin(firstStrike * Math.PI),
+      Math.sin(counterStrike * Math.PI),
+      Math.sin(finalStrike * Math.PI)
+    );
 
     attacker.position.lerpVectors(attackStart, attackerStance, easeInOut(approach));
-    defender.position.lerpVectors(defendStart, defenderStance, easeInOut(counter) * 0.16);
+    defender.position.lerpVectors(defendStart, defenderStance, easeInOut(squareOff) * 0.55);
 
-    if (t > 0.2 && t < 0.58) {
-      attacker.position.y = 0.18 + Math.sin((clashOne + counter) * Math.PI) * 0.34;
-      defender.position.y = 0.18 + Math.sin(counter * Math.PI) * 0.18;
-      attacker.rotation.z = attackerStartRotation.z + Math.sin(t * Math.PI * 12) * 0.18;
-      defender.rotation.z = defenderStartRotation.z - Math.sin(t * Math.PI * 10) * 0.14;
-      attacker.rotation.x = attackerStartRotation.x - clashOne * 0.32 + counter * 0.18;
-      defender.rotation.x = defenderStartRotation.x + counter * 0.28;
+    if (approach > 0 && approach < 1) {
+      applyWalkingPose(attacker, approach, 3, attacker.userData.type);
     }
 
-    if (t >= 0.58) {
-      const strike = easeOutBack(finalHit);
+    if (squareOff > 0) {
+      attacker.position.lerpVectors(attackerStance, attackerWindup, Math.sin(squareOff * Math.PI) * 0.35);
+      defender.position.lerpVectors(defendStart, defenderStance, easeInOut(squareOff));
+      attacker.rotation.z = attackerStartRotation.z - squareOff * 0.16;
+      defender.rotation.z = defenderStartRotation.z + squareOff * 0.12;
+    }
+
+    if (firstStrike > 0) {
+      const jab = Math.sin(firstStrike * Math.PI);
+      attacker.position.lerpVectors(attackerWindup, defenderStance, easeOutBack(firstStrike) * 0.5);
+      attacker.position.y = 0.18 + jab * 0.42;
+      attacker.rotation.z = attackerStartRotation.z + jab * 0.34;
+      defender.position.x = defenderStance.x + jab * 0.08;
+      defender.rotation.z = defenderStartRotation.z - jab * 0.24;
+    }
+
+    if (counterStrike > 0) {
+      const counter = Math.sin(counterStrike * Math.PI);
+      defender.position.lerpVectors(defenderStance, defenderWindup, counter * 0.42);
+      defender.position.y = 0.18 + counter * 0.28;
+      defender.rotation.z = defenderStartRotation.z + counter * 0.36;
+      attacker.position.x = attackerStance.x - counter * 0.08;
+      attacker.rotation.z = attackerStartRotation.z - counter * 0.22;
+    }
+
+    if (finalStrike > 0) {
+      const strike = easeOutBack(finalStrike);
+      const hit = Math.sin(finalStrike * Math.PI);
       attacker.position.lerpVectors(attackerStance, targetPos, strike);
-      attacker.position.y = 0.18 + Math.sin(finalHit * Math.PI) * 0.72;
-      attacker.rotation.z = attackerStartRotation.z + Math.sin(finalHit * Math.PI) * 0.42;
-      defender.position.x = defenderStance.x + Math.sin(finalHit * Math.PI * 5) * 0.08;
-      defender.position.z = defenderStance.z - finalHit * 0.58;
-      defender.position.y = 0.18 + Math.sin(finalHit * Math.PI) * 0.26;
-      defender.rotation.z = defenderStartRotation.z - finalHit * 1.15;
-      defender.rotation.x = defenderStartRotation.x + finalHit * 0.75;
+      attacker.position.y = 0.18 + hit * 0.68;
+      attacker.rotation.z = attackerStartRotation.z + hit * 0.5;
+      defender.position.x = defenderStance.x + Math.sin(finalStrike * Math.PI * 5) * 0.1;
+      defender.position.z = defenderStance.z - finalStrike * 0.72;
+      defender.position.y = 0.18 + hit * 0.32;
+      defender.rotation.z = defenderStartRotation.z - finalStrike * 1.25;
+      defender.rotation.x = defenderStartRotation.x + finalStrike * 0.82;
       defender.scale.setScalar(1 - vanish * 0.72);
     }
 
-    flash.scale.setScalar(0.25 + Math.max(clashOne, counter, finalHit) * 2.45);
+    flash.scale.setScalar(0.25 + clashPulse * 2.65);
     flash.material.opacity = Math.max(0, 0.58 * (1 - vanish));
-    shockwave.scale.setScalar(0.5 + finalHit * 3.2 + vanish * 1.6);
-    shockwave.material.opacity = Math.max(0, 0.34 * finalHit * (1 - vanish));
+    clashRing.scale.setScalar(0.45 + clashPulse * 1.4);
+    clashRing.material.opacity = Math.max(0, 0.5 * clashPulse * (1 - vanish));
+    shockwave.scale.setScalar(0.5 + finalStrike * 3.2 + vanish * 1.6);
+    shockwave.material.opacity = Math.max(0, 0.34 * finalStrike * (1 - vanish));
   }, () => {
     boardGroup.remove(flash);
     boardGroup.remove(shockwave);
+    boardGroup.remove(clashRing);
+    setWalkingMode(attacker, false);
     defender.position.copy(defendStart);
     defender.rotation.copy(defenderStartRotation);
     defender.scale.set(1, 1, 1);
-    attacker.rotation.copy(attackerStartRotation);
+    resetPiecePose(attacker, attackerStartRotation);
     attacker.position.copy(targetPos);
     attacker.position.y = 0.18;
     onDone();
@@ -646,6 +1005,17 @@ function createShockwave(position) {
   wave.position.y = 0.18;
   wave.rotation.x = -Math.PI / 2;
   return wave;
+}
+
+function createClashRing(position) {
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.16, 0.2, 48),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide })
+  );
+  ring.position.copy(position);
+  ring.position.y = 0.42;
+  ring.rotation.x = -Math.PI / 2;
+  return ring;
 }
 
 function addAnimation(duration, update, done) {
@@ -726,7 +1096,7 @@ function calculateLegalMoves(squareId) {
 function updateHud(message) {
   statusElement.textContent = message;
   turnPill.textContent = sideLabel(currentPlayer);
-  turnPill.style.color = currentPlayer === 'white' ? '#fff4cf' : '#ffdfdc';
+  turnPill.style.color = currentPlayer === 'white' ? '#a9ecff' : '#ffb1ad';
 }
 
 function updateCaptured() {
@@ -735,7 +1105,7 @@ function updateCaptured() {
 }
 
 function sideLabel(color) {
-  return color === 'white' ? 'White Pride' : 'Black Pride';
+  return color === 'white' ? 'Blue' : 'Red';
 }
 
 function toggleSound() {
@@ -744,7 +1114,7 @@ function toggleSound() {
   soundButton.setAttribute('aria-pressed', String(soundEnabled));
   if (soundEnabled) {
     ensureAudio();
-    playSound('select');
+    playSelectionSound('pawn');
   }
 }
 
@@ -802,11 +1172,89 @@ function playSound(kind, delay = 0) {
   }
 }
 
-function playFightSoundtrack() {
-  playSound('clash', 0.38);
-  playSound('counter', 0.82);
-  playSound('clash', 1.16);
-  playSound('impact', 1.48);
+function playSelectionSound(type, delay = 0) {
+  const context = ensureAudio();
+  if (!context || !soundEnabled) return;
+  const now = context.currentTime + delay;
+
+  if (type === 'pawn') {
+    felineCall({ start: now, base: 320, end: 210, duration: 0.18, gain: 0.045, noise: 0.025 });
+    tone({ frequency: 720, endFrequency: 560, start: now + 0.04, duration: 0.08, gain: 0.014, type: 'triangle' });
+    return;
+  }
+
+  if (type === 'king') {
+    felineCall({ start: now, base: 150, end: 62, duration: 0.72, gain: 0.1, noise: 0.11 });
+    tone({ frequency: 82, endFrequency: 48, start: now + 0.06, duration: 0.5, gain: 0.075, type: 'sawtooth' });
+    return;
+  }
+
+  if (type === 'queen') {
+    felineCall({ start: now, base: 220, end: 130, duration: 0.48, gain: 0.07, noise: 0.055 });
+    tone({ frequency: 660, endFrequency: 420, start: now + 0.04, duration: 0.16, gain: 0.025, type: 'triangle' });
+    return;
+  }
+
+  if (type === 'rook') {
+    felineCall({ start: now, base: 180, end: 92, duration: 0.42, gain: 0.075, noise: 0.08 });
+    return;
+  }
+
+  if (type === 'bishop') {
+    felineCall({ start: now, base: 260, end: 150, duration: 0.34, gain: 0.055, noise: 0.04 });
+    tone({ frequency: 520, endFrequency: 740, start: now + 0.08, duration: 0.14, gain: 0.016, type: 'sine' });
+    return;
+  }
+
+  if (type === 'knight') {
+    felineCall({ start: now, base: 300, end: 170, duration: 0.28, gain: 0.06, noise: 0.055 });
+  }
+}
+
+function playFightSoundtrack(attackerType, defenderType) {
+  playSelectionSound(attackerType, 0.08);
+  playSound('clash', 0.72);
+  playSelectionSound(defenderType, 1.02);
+  playSound('counter', 1.26);
+  playSound('clash', 1.68);
+  playSound('impact', 2.05);
+}
+
+function felineCall({ start, base, end, duration, gain, noise }) {
+  growlTone({ frequency: base, endFrequency: end, start, duration, gain, type: 'sawtooth' });
+  growlTone({ frequency: base * 0.52, endFrequency: end * 0.55, start: start + 0.02, duration, gain: gain * 0.72, type: 'square' });
+  noiseBurst({ start, duration: duration * 0.72, gain: noise, filterFrequency: Math.max(180, base * 4) });
+}
+
+function growlTone({ frequency, endFrequency, start, duration, gain, type }) {
+  const context = audioContext;
+  const oscillator = context.createOscillator();
+  const tremolo = context.createOscillator();
+  const tremoloGain = context.createGain();
+  const envelope = context.createGain();
+  const filter = context.createBiquadFilter();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, start);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), start + duration);
+  tremolo.frequency.setValueAtTime(24, start);
+  tremoloGain.gain.setValueAtTime(frequency * 0.045, start);
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(Math.max(360, frequency * 3), start);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(160, endFrequency * 2), start + duration);
+  envelope.gain.setValueAtTime(0.0001, start);
+  envelope.gain.exponentialRampToValueAtTime(gain, start + duration * 0.12);
+  envelope.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+  tremolo.connect(tremoloGain);
+  tremoloGain.connect(oscillator.frequency);
+  oscillator.connect(filter);
+  filter.connect(envelope);
+  envelope.connect(context.destination);
+  tremolo.start(start);
+  oscillator.start(start);
+  tremolo.stop(start + duration + 0.02);
+  oscillator.stop(start + duration + 0.02);
 }
 
 function tone({ frequency, endFrequency, start, duration, gain, type }) {

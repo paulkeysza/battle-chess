@@ -138,6 +138,12 @@ h1 {
   backdrop-filter: blur(14px);
 }
 
+.status-group {
+  display: grid;
+  gap: 10px;
+  pointer-events: auto;
+}
+
 .actions {
   display: flex;
   gap: 8px;
@@ -152,6 +158,71 @@ h1 {
 .actions button:hover {
   border-color: rgba(241, 184, 74, 0.58);
   color: #fff5d6;
+}
+
+.mode-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(5, 7, 12, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.mode-overlay[hidden] {
+  display: none;
+}
+
+.mode-panel {
+  width: min(420px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(13, 17, 25, 0.92);
+  padding: 22px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+
+.mode-panel h2 {
+  margin-bottom: 18px;
+  font-size: 1.35rem;
+}
+
+.mode-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mode-actions button {
+  min-height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.mode-actions button:hover {
+  border-color: rgba(53, 200, 216, 0.58);
+  color: #dffbff;
+}
+
+.inline-mode-actions {
+  width: min(360px, calc(100vw - 44px));
+  grid-template-columns: 1fr 1fr;
+}
+
+.inline-mode-actions[hidden] {
+  display: none;
+}
+
+.inline-mode-actions button {
+  min-height: 42px;
+  background: rgba(9, 12, 18, 0.82);
+  backdrop-filter: blur(14px);
 }
 
 .side-panel {
